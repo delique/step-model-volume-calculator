@@ -1,12 +1,26 @@
+# Run with python main.py <step_file> <height_mm>
+
 import FreeCAD
 import Part
+import argparse
+from pathlib import Path
 import sys
 
-STEP_FILE = "tankVolumeCalculator.STEP"
+# Tank coordinate assumptions:
+# Y = vertical height direction
+# bottom of tank is at the model's minimum Y
+# units are mm
 
 def load_shape(step_file):
+    if not step_file.exists():
+        raise FileNotFoundError(f"STEP file not found: {step_file}")
+
     shape = Part.Shape()
-    shape.read(step_file)
+    shape.read(str(step_file))
+
+    if shape.isNull():
+        raise ValueError(f"Failed to read STEP geometry from: {step_file}")
+
     return shape
 
 def volume_at_height(shape, height_mm):
@@ -15,8 +29,8 @@ def volume_at_height(shape, height_mm):
     margin = 1000
     fill_box = Part.makeBox(
         bbox.XLength + 2 * margin,
-        bbox.YLength + 2 * margin,
         height_mm + margin,
+        bbox.ZLength + 2 * margin,
         FreeCAD.Vector(
             bbox.XMin - margin,
             bbox.YMin - margin,
@@ -31,11 +45,25 @@ def volume_at_height(shape, height_mm):
 
     return volume_litres
 
+
+def parse_args(argv):
+    parser = argparse.ArgumentParser(
+        description="Compute the volume of a STEP model up to a given fill height (mm)."
+    )
+    parser.add_argument("step_file", type=Path, help="Path to the STEP file")
+    parser.add_argument("height_mm", type=float, help="Fill height in mm")
+    return parser.parse_args(argv)
+
 if __name__ == "__main__":
-    step_shape = load_shape(STEP_FILE)
+    args = parse_args(sys.argv[1:])
 
-    h = float(sys.argv[1])
-    litres = volume_at_height(step_shape, h)
+    if args.height_mm < 0:
+        raise ValueError("height_mm must be non-negative")
 
-    print(f"Height: {h:.2f} mm")
+    step_shape = load_shape(args.step_file)
+
+    litres = volume_at_height(step_shape, args.height_mm)
+
+    print(f"STEP: {args.step_file}")
+    print(f"Height: {args.height_mm:.2f} mm")
     print(f"Volume: {litres:.3f} L")

@@ -1,6 +1,3 @@
-# Run with python main.py [step_file] [--increment-mm 0.1] [--max-height-mm 749] [--output-csv out.csv]
-# Defaults: tankVolumeCalculator.STEP, increment 0.1 mm, max height 749 mm
-
 import FreeCAD
 import Part
 import argparse
@@ -9,17 +6,13 @@ import math
 from pathlib import Path
 import sys
 
-# Tank coordinate assumptions:
-# height is measured from the minimum coordinate on the selected axis
-# units are mm
-
 AXIS_TO_BOUNDS = {
     "x": ("XMin", "XLength"),
     "y": ("YMin", "YLength"),
     "z": ("ZMin", "ZLength"),
 }
 
-def load_shape(step_file):
+def load_volume(step_file):
     if not step_file.exists():
         raise FileNotFoundError(f"STEP file not found: {step_file}")
 
@@ -29,11 +22,8 @@ def load_shape(step_file):
     if shape.isNull():
         raise ValueError(f"Failed to read STEP geometry from: {step_file}")
 
-    return shape
-
-
-def extract_volume_shape(shape):
     solids = list(shape.Solids)
+
     if solids:
         if len(solids) == 1:
             return solids[0]
@@ -43,8 +33,8 @@ def extract_volume_shape(shape):
         return shape
 
     raise ValueError(
-        "STEP contains no closed solids with volume. "
-        "Export a solid body or a watertight volume for tank calculations."
+            "STEP contains no closed solids with volume. "
+            "Export a solid body or a watertight volume for tank calculations."
     )
 
 
@@ -194,12 +184,6 @@ def parse_args(argv):
         help="Axis used as fill height direction (default: z)",
     )
     parser.add_argument(
-        "--height-origin",
-        choices=["model-min", "world-zero"],
-        default="world-zero",
-        help="Height zero reference: model minimum or global zero plane (default: world-zero)",
-    )
-    parser.add_argument(
         "--output-csv",
         type=Path,
         default=None,
@@ -210,8 +194,7 @@ def parse_args(argv):
 if __name__ == "__main__":
     args = parse_args(sys.argv[1:])
 
-    step_shape = load_shape(args.step_file)
-    volume_shape = extract_volume_shape(step_shape)
+    volume_shape = load_volume(args.step_file)
 
     output_csv = args.output_csv
     if output_csv is None:
@@ -222,7 +205,7 @@ if __name__ == "__main__":
         increment_mm=args.increment_mm,
         max_height_mm=args.max_height_mm,
         axis=args.height_axis,
-        origin_mode=args.height_origin,
+        origin_mode="world-zero",
     )
     write_volume_csv(rows, output_csv)
 
@@ -231,7 +214,7 @@ if __name__ == "__main__":
         increment_mm=args.increment_mm,
         max_height_mm=args.max_height_mm,
         axis=args.height_axis,
-        origin_mode=args.height_origin,
+        origin_mode="world-zero",
     )
 
     max_height_written = rows[-1][0] if rows else 0.0
@@ -242,7 +225,7 @@ if __name__ == "__main__":
     print(f"Height range: 0.000 mm to {max_height_written:.3f} mm")
     print(f"Increment: {args.increment_mm:.3f} mm")
     print(f"Height axis: {args.height_axis.upper()}")
-    print(f"Height origin: {args.height_origin}")
+    print(f"Height origin: world-zero")
     print(f"Axis minimum (solid bbox): {axis_min:.3f} mm")
     print(f"Axis length (solid bbox): {axis_length:.3f} mm")
     if rows and args.height_origin == "world-zero" and rows[0][1] > 0:
